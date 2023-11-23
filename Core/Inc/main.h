@@ -57,9 +57,12 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define LED2_Pin GPIO_PIN_11
+#define LED2_GPIO_Port GPIOB
+#define BUTTON_Pin GPIO_PIN_15
+#define BUTTON_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
-int getKey(uint8_t *queryString, uint16_t queryLength, uint8_t *key, uint8_t *keyLength);
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
