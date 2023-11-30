@@ -23,7 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "query_string.h"
 #include "i2c-lcd.h"
-#include "rc522.h"
+#include "RFID.h"
 #include "string.h"
 /* USER CODE END Includes */
 
@@ -38,9 +38,6 @@
 #define ESP32_UART huart1
 #define HDMA_ESP32_UART_RX hdma_usart1_rx
 #define CMD_SIZE 20
-#define BLOCK_SIZE 16
-#define ID_BLOCK 6
-#define ID_BLOCK_SECTOR 7
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -72,11 +69,9 @@ static void MX_SPI1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint8_t buff[MFRC522_MAX_LEN];
-uint8_t status = 5;
-uint8_t Sectorkey[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-uint8_t id[12] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
-uint8_t count = 0;
+//uint8_t id[12] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+uint8_t id[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
 //void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 //{
 //	HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
@@ -89,58 +84,6 @@ uint8_t count = 0;
 //    HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, Rx_data, RX_BUFFER_SIZE);
 //    __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
 //}
-
-void signExtend(uint8_t* id, uint8_t* buf) {
-	for(uint8_t i = 0; i < 12; i++)
-		buf[i] = id[i];
-	for(uint8_t i = 12; i < BLOCK_SIZE; i++)
-		buf[i] = 0;
-}
-
-uint8_t compare(uint8_t* p1, uint8_t* p2, uint8_t size) {
-	return strncmp((char*)p1, (char*)p2, size);
-}
-
-typedef enum {
-	RFID_OK = 0,
-	RFID_WRITE_ERR = 1,
-	RFID_READ_ERR = 2
-} RFID_Status;
-
-//uint8_t writeID(uint8_t* id)
-uint8_t writeID(uint8_t* id)
-{
-	TM_MFRC522_Init();
-	if(TM_MFRC522_Request(PICC_REQIDL, buff) != MI_OK || TM_MFRC522_Anticoll(buff) != MI_OK)
-		return RFID_WRITE_ERR;
-
-	status = 5;
-	TM_MFRC522_SelectTag(buff);
-	status = TM_MFRC522_Auth(PICC_AUTHENT1A, ID_BLOCK_SECTOR, Sectorkey, buff);
-
-	if(status != MI_OK)
-		return RFID_WRITE_ERR;
-
-	uint8_t signExtendedID[BLOCK_SIZE];
-	uint8_t dataAfter[BLOCK_SIZE];
-	uint8_t tryCount = 0;
-
-	signExtend(id, signExtendedID);
-
-	do {
-	tryCount++;
-	TM_MFRC522_Write(ID_BLOCK, signExtendedID);
-	TM_MFRC522_Read(ID_BLOCK, dataAfter);
-	} while(tryCount < 5 && compare(signExtendedID, dataAfter, BLOCK_SIZE) != 0);
-
-	TM_MFRC522_Halt();
-	TM_MFRC522_ClearBitMask(MFRC522_REG_STATUS2, 0x08);
-
-	if(tryCount >= 5)
-		return RFID_WRITE_ERR;
-
-	return RFID_OK;
-}
 
 
 
@@ -182,7 +125,7 @@ int main(void)
 //  __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
 
   lcd_init();
-  TM_MFRC522_Init();
+  RFID_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -190,7 +133,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	  writeID(id);
+	  readID(id);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
