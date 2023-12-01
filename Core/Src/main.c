@@ -38,6 +38,8 @@
 #define ESP32_UART huart1
 #define HDMA_ESP32_UART_RX hdma_usart1_rx
 #define CMD_SIZE 20
+#define NAME_SIZE 17 //include '\0'
+#define FEE_SIZE 6
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -75,20 +77,40 @@ uint8_t id[ID_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t str_id[ID_SIZE*2 + 1];
 uint8_t Rx_data[RX_BUFFER_SIZE];
 
+void onOpen(uint8_t* Rx_data) {
+	uint8_t name[NAME_SIZE];
+	uint8_t fee[FEE_SIZE];
+	uint8_t buf[17];
+	getKey(Rx_data, "name=", name);
+	getKey(Rx_data, "fee=", fee);
+	sprintf((char*)buf, "Fee: %s", fee);
+	lcd_goto_XY(1, 0);
+	lcd_send_string((char*)name);
+	lcd_goto_XY(2, 0);
+	lcd_send_string((char*)buf);
+}
 
-void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
-{
+uint8_t commandHandle(uint8_t* Rx_data, uint16_t Size) {
 	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-    // handle interrupt here
+
 	uint8_t cmd[CMD_SIZE];
 	Rx_data[Size] = '\0'; // ESP32 serial printf ignore the \0, so we have to add it manually
 	getKey(Rx_data, "cmd=", cmd);
+
+	if(strcmp((char*)cmd, "open") == 0)
+		onOpen(Rx_data);
+	return 0;
+}
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+    // handle interrupt here
+	commandHandle(Rx_data, Size);
 
 	// enable receive in dma mode again
     HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, Rx_data, RX_BUFFER_SIZE);
     __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
 }
-
 
 
 /* USER CODE END 0 */
@@ -109,6 +131,7 @@ int main(void)
 
   /* USER CODE BEGIN Init */
   uint8_t uart_buf[RX_BUFFER_SIZE];
+  RFID_Status writeOK = RFID_WRITE_ERR;
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -131,7 +154,6 @@ int main(void)
   lcd_init();
   RFID_Init();
 
-  RFID_Status writeOK = RFID_WRITE_ERR;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -145,8 +167,8 @@ int main(void)
 		  convertToString(id, str_id);
 		  sprintf((char*)uart_buf, "cmd=read&id=%s",(char*)str_id);
 		  HAL_UART_Transmit(&ESP32_UART, uart_buf, strlen((char*)uart_buf), 100);
+  	  }
     /* USER CODE END WHILE */
-	  }
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
