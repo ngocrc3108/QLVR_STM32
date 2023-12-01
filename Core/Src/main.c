@@ -41,6 +41,7 @@
 #define CMD_SIZE 20
 #define NAME_SIZE 17 //include '\0'
 #define FEE_SIZE 6
+#define LCD_LENGTH 16
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -90,10 +91,25 @@ void StartTask02(void *argument);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 //656453c15c8b1513e1d70c8e
-uint8_t newID[ID_SIZE] = {0x65, 0x64, 0x53, 0xc1, 0x5c, 0x8b, 0x15, 0x13, 0xe1, 0xd7, 0x0c, 0x8e};
-uint8_t id[ID_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint8_t id[ID_SIZE + 1];
 uint8_t str_id[ID_SIZE*2 + 1];
 uint8_t Rx_data[RX_BUFFER_SIZE];
+
+void convertStringToHexId(uint8_t* str, uint8_t* id) {
+	for(uint8_t i = 0, j = 0; i < ID_SIZE; i++, j+=2) {
+		// first character
+		if(str[j] >= '0' && str[j] <= '9')
+			id[i] = ((str[j] - '0') << 4);
+		else
+			id[i] = ((str[j] - 'a' + 10) << 4);
+
+		// second character
+		if(str[j+1] >= '0' && str[j+1] <= '9')
+			id[i] += str[j+1] - '0';
+		else
+			id[i] += str[j+1] - 'a' + 10;
+	}
+}
 
 void onOpen(uint8_t* Rx_data) {
 	uint8_t name[NAME_SIZE];
@@ -108,6 +124,32 @@ void onOpen(uint8_t* Rx_data) {
 	lcd_send_string((char*)buf);
 }
 
+void onWrite(uint8_t* Rx_data) {
+	uint8_t username[LCD_LENGTH + 1];
+	//uint8_t* buf[LCD_LENGTH + 1];
+	uint8_t count = 0;
+	getKey(Rx_data, "username=", username);
+
+	getKey(Rx_data, "id=", str_id);
+	convertStringToHexId(str_id, id);
+
+	lcd_clear_display();
+
+	lcd_goto_XY(1, 0);
+	lcd_send_string("  Link Tag"); //in ra bi mat 2 chu dau????
+
+	lcd_goto_XY(2, 0);
+	lcd_send_string((char*)username);
+
+	while(writeID(id) != RFID_OK) {
+		count++;
+		if(count == 20) {
+			HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+			count = 0;
+		}
+	}
+}
+
 uint8_t commandHandle(uint8_t* Rx_data, uint16_t Size) {
 	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 
@@ -117,6 +159,9 @@ uint8_t commandHandle(uint8_t* Rx_data, uint16_t Size) {
 
 	if(strcmp((char*)cmd, "open") == 0)
 		onOpen(Rx_data);
+	else if(strcmp((char*)cmd, "write") == 0)
+		onWrite(Rx_data);
+
 	return 0;
 }
 
@@ -452,19 +497,16 @@ static void MX_GPIO_Init(void)
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  uint8_t uart_buf[RX_BUFFER_SIZE];
-  RFID_Status writeOK = RFID_WRITE_ERR;
+  //uint8_t uart_buf[RX_BUFFER_SIZE];
+  //RFID_Status writeOK = RFID_WRITE_ERR;
   /* Infinite loop */
   for(;;)
   {
-	  if(writeOK != RFID_OK)
-		  writeOK = writeID(newID);
-
-	  if(readID(id) == RFID_OK) {
-		  convertToString(id, str_id);
-		  sprintf((char*)uart_buf, "cmd=read&id=%s",(char*)str_id);
-		  HAL_UART_Transmit(&ESP32_UART, uart_buf, strlen((char*)uart_buf), 100);
-  	  }
+//	  if(readID(id) == RFID_OK) {
+//		  convertToString(id, str_id);
+//		  sprintf((char*)uart_buf, "cmd=read&id=%s",(char*)str_id);
+//		  HAL_UART_Transmit(&ESP32_UART, uart_buf, strlen((char*)uart_buf), 100);
+//  	  }
   }
   /* USER CODE END 5 */
 }
@@ -482,8 +524,11 @@ void StartTask02(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  lcd_clear_display();
-	  osDelay(3000);
+//	  lcd_clear_display();
+//	  lcd_goto_XY(1, 0);
+//	  lcd_send_string("scan here");
+//	  HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+//	  osDelay(10000);
   }
   /* USER CODE END StartTask02 */
 }
