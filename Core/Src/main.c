@@ -69,21 +69,25 @@ static void MX_SPI1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint8_t newID[ID_SIZE] = {3, 3, 3, 3, 3, 7, 8, 9, 10, 11, 12, 13};
+//656453c15c8b1513e1d70c8e
+uint8_t newID[ID_SIZE] = {0x65, 0x64, 0x53, 0xc1, 0x5c, 0x8b, 0x15, 0x13, 0xe1, 0xd7, 0x0c, 0x8e};
 uint8_t id[ID_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t str_id[ID_SIZE*2 + 1];
-//void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
-//{
-//	HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
-//    // handle interrupt here
-//	uint8_t cmd[CMD_SIZE] = {'\0'};
-//	Rx_data[Size] = '\0'; // ESP32 serial printf ignore the \0, so we have to add it manually
-//	getKey(Rx_data, "cmd=", cmd);
-//
-//	// enable receive in dma mode again
-//    HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, Rx_data, RX_BUFFER_SIZE);
-//    __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
-//}
+uint8_t Rx_data[RX_BUFFER_SIZE];
+
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+    // handle interrupt here
+	uint8_t cmd[CMD_SIZE];
+	Rx_data[Size] = '\0'; // ESP32 serial printf ignore the \0, so we have to add it manually
+	getKey(Rx_data, "cmd=", cmd);
+
+	// enable receive in dma mode again
+    HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, Rx_data, RX_BUFFER_SIZE);
+    __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
+}
 
 
 
@@ -104,7 +108,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  uint8_t uart_buf[RX_BUFFER_SIZE];
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -121,21 +125,28 @@ int main(void)
   MX_I2C1_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-//  HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, Rx_data, RX_BUFFER_SIZE);
-//  __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
+  HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, Rx_data, RX_BUFFER_SIZE);
+  __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
 
   lcd_init();
   RFID_Init();
+
+  RFID_Status writeOK = RFID_WRITE_ERR;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* USER CODE END WHILE */
-//	  writeID(newID);
-	  if(readID(id) == RFID_OK)
+	  if(writeOK != RFID_OK)
+		  writeOK = writeID(newID);
+
+	  if(readID(id) == RFID_OK) {
 		  convertToString(id, str_id);
+		  sprintf((char*)uart_buf, "cmd=read&id=%s",(char*)str_id);
+		  HAL_UART_Transmit(&ESP32_UART, uart_buf, strlen((char*)uart_buf), 100);
+    /* USER CODE END WHILE */
+	  }
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */

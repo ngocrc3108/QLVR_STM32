@@ -17,12 +17,12 @@ void RFID_Init() {
 
 void convertToString(uint8_t* id, uint8_t* str) {
 	for(uint8_t i = 0; i < ID_SIZE; i++)
-		sprintf((char*)(str + i*2), "%02X", id[i]);
+		sprintf((char*)(str + i*2), "%02x", id[i]);
 	str[ID_SIZE*2] = '\0';
 }
 
 RFID_Status writeID(uint8_t* id) {
-	TM_MFRC522_Init();
+	//TM_MFRC522_Init();
 	if(TM_MFRC522_Request(PICC_REQIDL, buff) != MI_OK || TM_MFRC522_Anticoll(buff) != MI_OK)
 		return RFID_WRITE_ERR;
 
@@ -53,7 +53,7 @@ RFID_Status writeID(uint8_t* id) {
 }
 
 RFID_Status readID(uint8_t* id) {
-	TM_MFRC522_Init();
+	//TM_MFRC522_Init();
 	if(TM_MFRC522_Request(PICC_REQIDL, buff) != MI_OK || TM_MFRC522_Anticoll(buff) != MI_OK)
 		return RFID_WRITE_ERR;
 
