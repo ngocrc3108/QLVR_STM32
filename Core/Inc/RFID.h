@@ -11,6 +11,7 @@
 #include "rc522.h"
 #include "string.h"
 
+#define ID_SIZE 12
 #define BLOCK_SIZE 16
 #define ID_BLOCK 6
 #define ID_SECTOR_BLOCK 7
@@ -22,8 +23,8 @@ typedef enum {
 } RFID_Status;
 
 extern void RFID_Init();
-extern void signExtend(uint8_t* id, uint8_t* buf);
-extern uint8_t writeID(uint8_t* id);
-extern uint8_t readID(uint8_t* id);
+extern void convertToString(uint8_t* id, uint8_t* str);
+extern RFID_Status writeID(uint8_t* id);
+extern RFID_Status readID(uint8_t* id);
 
 #endif /* INC_RFID_H_ */

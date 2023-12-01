@@ -69,9 +69,9 @@ static void MX_SPI1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-//uint8_t id[12] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
-uint8_t id[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-
+uint8_t newID[ID_SIZE] = {3, 3, 3, 3, 3, 7, 8, 9, 10, 11, 12, 13};
+uint8_t id[ID_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint8_t str_id[ID_SIZE*2 + 1];
 //void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 //{
 //	HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
@@ -133,7 +133,9 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	  readID(id);
+//	  writeID(newID);
+	  if(readID(id) == RFID_OK)
+		  convertToString(id, str_id);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
