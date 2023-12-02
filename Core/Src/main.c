@@ -72,7 +72,8 @@ static void MX_SPI1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-SYS_State state;
+Sys_Mode mode;
+Read_State readState;
 uint8_t id[ID_SIZE + 1];
 uint8_t str_id[ID_SIZE*2 + 1];
 uint8_t Rx_data[UART_BUFFER_SIZE];
@@ -122,14 +123,18 @@ void onDeny(uint8_t* Rx_data) {
 	getKey(Rx_data, "reason=", reason);
 
 	lcd_clear_display();
+	HAL_Delay(50);
 	lcd_goto_XY(1, 0);
 	lcd_send_string((char*)reason);
 }
 
-SYS_State onWrite() {
+Write_Status onWrite() {
 	uint8_t username[LCD_LENGTH + 1];
-	//uint8_t* buf[LCD_LENGTH + 1];
 	uint8_t count = 0;
+	uint32_t startTime = HAL_GetTick();
+	uint8_t isTimeOut = 0;
+	uint8_t countDot = 0;
+
 	getKey(Rx_data, "username=", username);
 
 	getKey(Rx_data, "id=", str_id);
@@ -139,25 +144,48 @@ SYS_State onWrite() {
 	HAL_Delay(50);
 
 	lcd_goto_XY(1, 0);
-	lcd_send_string("Link Tag");
+	lcd_send_string("LINK TAG");
 
 	lcd_goto_XY(2, 0);
 	lcd_send_string((char*)username);
 
-	while(writeID(id) != RFID_OK) {
+	lcd_goto_XY(1, 9);
+
+	while(writeID(id) != RFID_OK  && !isTimeOut) {
+		isTimeOut = HAL_GetTick() - startTime > 10*1000;
 		count++;
 		if(count == 20) {
-			HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
 			count = 0;
+			countDot++;
+			if(countDot == 6) {
+				countDot = 0;
+				lcd_goto_XY(1, 9);
+				lcd_send_string("       ");
+				lcd_goto_XY(1, 9);
+			}
+			HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+			lcd_send_string(".");
 		}
 	}
 
-	return SYS_READ;
+	lcd_goto_XY(1, 0);
+
+	if(isTimeOut) {
+	  lcd_send_string("LINK TAG TIMEOUT");
+	  return WRITE_TIMEOUT;
+	}
+	else {
+	  lcd_send_string("LINK TAG OK     ");
+	  sprintf((char*)Tx_data, "cmd=writeRes&status=ok&id=%s", str_id);
+	  HAL_UART_Transmit(&ESP32_UART, Tx_data, strlen((char*)Tx_data), 100);
+	}
+
+	return WRITE_OK;
 }
 
-SYS_State onRead(uint32_t* readTime) {
+Read_State onRead(uint32_t* readTime) {
 	if(readID(id) != RFID_OK)
-		return SYS_READ; // read again
+		return RS_Reading; // read again
 
   convertToString(id, str_id);
   sprintf((char*)Tx_data, "cmd=read&id=%s",(char*)str_id);
@@ -166,23 +194,37 @@ SYS_State onRead(uint32_t* readTime) {
 
   *readTime = HAL_GetTick();
 
-  return SYS_WAIT; // wait for response
+  return RS_WAIT; // wait for response
 }
 
-SYS_State onWait(uint32_t readTime) {
-	while(state == SYS_WAIT && HAL_GetTick() - readTime < 20*1000 ) {
-		HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+Read_State onWait(uint32_t readTime) {
+	uint8_t count = 0;
+	lcd_goto_XY(2, 0);
+	while(readState == RS_WAIT && HAL_GetTick() - readTime < 20*1000 ) {
+		count++;
+		if(count == 12) {
+			count = 0;
+			lcd_goto_XY(2, 0);
+			lcd_send_string("            ");
+			lcd_goto_XY(2, 0);
+		}
+
 		HAL_Delay(100);
+		HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+		lcd_send_string(".");
 	}
 
 	// time out
-	if(state == SYS_WAIT)
-		return SYS_READ;
+	if(readState == RS_WAIT) {
+		lcd_goto_XY(2, 0);
+		lcd_send_string("            ");
+		return RS_Reading;
+	}
 
-	return SYS_RESPONSE;
+	return RS_RESPONSE;
 }
 
-SYS_State onResponse() {
+Read_State onResponse() {
 	uint8_t cmd[CMD_SIZE];
 	getKey(Rx_data, "cmd=", cmd);
 
@@ -191,7 +233,7 @@ SYS_State onResponse() {
 	else if(strcmp((char*)cmd, "deny") == 0)
 		onDeny(Rx_data);
 
-	return SYS_READ;
+	return RS_Reading;
 }
 
 
@@ -203,9 +245,9 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 	getKey(Rx_data, "cmd=", cmd);
 
 	if(strcmp((char*)cmd, "write") == 0)
-		state = SYS_WRITE;
-	else if(state == SYS_WAIT)
-		state = SYS_RESPONSE;
+		mode = SYS_WRITE;
+	else if(readState == RS_WAIT)
+		readState = RS_RESPONSE;
 
 	// enable receive in dma mode again
     HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, Rx_data, UART_BUFFER_SIZE);
@@ -254,9 +296,10 @@ int main(void)
   RFID_Init();
 
   uint32_t readTime;
-  uint32_t responseTime;
-  state = SYS_READ;
-  uint8_t done = 1;
+  uint32_t displayTime;
+  mode = SYS_READ;
+  readState = RS_Reading;
+  uint8_t displayDone = 1;
 
   /* USER CODE END 2 */
 
@@ -264,26 +307,32 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if(state == SYS_READ)
-		  state = onRead(&readTime);
-
-	  if(state == SYS_WAIT)
-		  state = onWait(readTime);
-
-	  if(state == SYS_RESPONSE) {
-		  state = onResponse();
-		  responseTime = HAL_GetTick();
-		  done = 0;
+	  // writing mode is determined by UART interrupt
+	  if(mode == SYS_WRITE) {
+		  onWrite();
+		  mode = SYS_READ;
+		  readState = RS_Reading;
+		  displayTime = HAL_GetTick();
+		  displayDone = 0;
+	  }
+	  else {
+		  // reading mode
+		  if(readState == RS_Reading)
+			  readState = onRead(&readTime);
+		  else if(readState == RS_WAIT)
+			  readState = onWait(readTime);
+		  else if(readState == RS_RESPONSE) {
+			  readState = onResponse();
+			  displayTime = HAL_GetTick();
+			  displayDone = 0;
+		  }
 	  }
 
-	  if(state == SYS_WRITE)
-		  state = onWrite();
-
-	  if(!done && HAL_GetTick() - responseTime > 5*1000) {
+	  // clear the screen after 5 second
+	  if(!displayDone && HAL_GetTick() - displayTime > 5*1000) {
 		  displayHomeCreen();
-		  done = 1;
+		  displayDone = 1;
 	  }
-
 
     /* USER CODE END WHILE */
 

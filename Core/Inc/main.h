@@ -65,16 +65,25 @@ void Error_Handler(void);
 #define BUTTON_GPIO_Port GPIOB
 
 typedef enum {
-	SYS_READ = 0,
-	SYS_WRITE,
-	SYS_WAIT,
-	SYS_RESPONSE
-} SYS_State;
+	RS_Reading = 0,
+	RS_WAIT,
+	RS_RESPONSE
+} Read_State;
+
+typedef enum {
+	SYS_READ,
+	SYS_WRITE
+} Sys_Mode;
+
+typedef enum {
+	WRITE_OK = 0,
+	WRITE_TIMEOUT
+} Write_Status;
 
 /* USER CODE BEGIN Private defines */
-SYS_State onRead(uint32_t* readTime);
-SYS_State onWait(uint32_t readTime);
-SYS_State onResponse();
+Read_State onRead(uint32_t* readTime);
+Read_State onWait(uint32_t readTime);
+Read_State onResponse();
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
