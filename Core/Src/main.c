@@ -75,7 +75,7 @@ static void MX_SPI1_Init(void);
 /* USER CODE BEGIN 0 */
 Sys_Mode mode;
 Read_State readState;
-uint8_t id[ID_SIZE + 1];
+uint8_t id[ID_SIZE + 1] = {0xEE, 0xEE, 0xEE};
 uint8_t str_id[ID_SIZE*2 + 1];
 uint8_t Rx_data[UART_BUFFER_SIZE];
 uint8_t Tx_data[UART_BUFFER_SIZE];
@@ -175,14 +175,14 @@ Read_State onRead(uint32_t* readTime) {
 	if(readID(id) != RFID_OK)
 		return RS_READING; // read again
 
-  convertToString(id, str_id);
-  sprintf((char*)Tx_data, "cmd=read&id=%s",(char*)str_id);
+	convertToString(id, str_id);
+	sprintf((char*)Tx_data, "cmd=read&id=%s",(char*)str_id);
 
-  HAL_UART_Transmit(&ESP32_UART, Tx_data, strlen((char*)Tx_data), 100);
+	HAL_UART_Transmit(&ESP32_UART, Tx_data, strlen((char*)Tx_data), 100);
 
-  *readTime = HAL_GetTick();
+	*readTime = HAL_GetTick();
 
-  return RS_WAIT; // wait for response
+	return RS_WAIT; // wait for response
 }
 
 Read_State onWait(uint32_t readTime) {
@@ -288,7 +288,7 @@ int main(void)
   uint32_t displayTime;
   mode = SYS_READ;
   readState = RS_READING;
-  Display_mode displayMode = displayHomeScreen();;
+  Display_mode displayMode = displayHomeScreen();
 
   /* USER CODE END 2 */
 
