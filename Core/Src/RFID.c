@@ -21,6 +21,22 @@ void convertToString(uint8_t* id, uint8_t* str) {
 	str[ID_SIZE*2] = '\0';
 }
 
+void convertStringToHexId(uint8_t* str, uint8_t* id) {
+	for(uint8_t i = 0, j = 0; i < ID_SIZE; i++, j+=2) {
+		// first character
+		if(str[j] >= '0' && str[j] <= '9')
+			id[i] = ((str[j] - '0') << 4);
+		else
+			id[i] = ((str[j] - 'a' + 10) << 4);
+
+		// second character
+		if(str[j+1] >= '0' && str[j+1] <= '9')
+			id[i] += str[j+1] - '0';
+		else
+			id[i] += str[j+1] - 'a' + 10;
+	}
+}
+
 RFID_Status writeID(uint8_t* id) {
 	//TM_MFRC522_Init();
 	if(TM_MFRC522_Request(PICC_REQIDL, buff) != MI_OK || TM_MFRC522_Anticoll(buff) != MI_OK)

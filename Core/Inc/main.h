@@ -65,25 +65,40 @@ void Error_Handler(void);
 #define BUTTON_GPIO_Port GPIOB
 
 typedef enum {
-	RS_Reading = 0,
-	RS_WAIT,
-	RS_RESPONSE
-} Read_State;
-
-typedef enum {
 	SYS_READ,
 	SYS_WRITE
 } Sys_Mode;
+
+typedef enum {
+	RS_READING = 0,
+	RS_WAIT,
+	RS_RESPONSE
+} Read_State;
 
 typedef enum {
 	WRITE_OK = 0,
 	WRITE_TIMEOUT
 } Write_Status;
 
+typedef enum {
+	DM_HOME_SCREEN,
+	DM_INFO
+} Display_mode;
+
 /* USER CODE BEGIN Private defines */
+
+// function for check-in/check-out
 Read_State onRead(uint32_t* readTime);
-Read_State onWait(uint32_t readTime);
+Read_State onWait(uint32_t readTime); // wait for reading response (open or deny)
 Read_State onResponse();
+void onOpen(uint8_t* Rx_data);
+void onDeny(uint8_t* Rx_data);
+
+// function for linking user account to a RFID tag
+Write_Status onWrite();
+
+Display_mode displayHomeScreen();
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

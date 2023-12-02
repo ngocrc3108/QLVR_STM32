@@ -1,10 +1,3 @@
-/*
- * RFID.h
- *
- *  Created on: Nov 30, 2023
- *      Author: ngocrc
- */
-
 #ifndef INC_RFID_H_
 #define INC_RFID_H_
 
@@ -18,13 +11,13 @@
 
 typedef enum {
 	RFID_OK = 0,
-	RFID_WRITE_ERR = 1,
-	RFID_READ_ERR = 2,
-	RFID_WAIT_ERR = 3
+	RFID_WRITE_ERR,
+	RFID_READ_ERR,
 } RFID_Status;
 
 extern void RFID_Init();
 extern void convertToString(uint8_t* id, uint8_t* str);
+extern void convertStringToHexId(uint8_t* str, uint8_t* id);
 extern RFID_Status writeID(uint8_t* id);
 extern RFID_Status readID(uint8_t* id);
 

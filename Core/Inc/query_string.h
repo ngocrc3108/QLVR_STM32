@@ -1,7 +1,10 @@
 #include "string.h"
-#include "main.h"
+#include <stdint.h>
 #include "stdio.h"
 
-#define KEY_SIZE
+typedef enum {
+	GP_OK = 0,
+	GP_ERR
+} Get_Parameter_Status;
 
-uint8_t getKey(uint8_t* queryString, const char* key, uint8_t* value);
+Get_Parameter_Status getParameter(uint8_t* queryString, const char* parameterName, uint8_t* value);

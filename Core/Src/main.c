@@ -41,6 +41,7 @@
 #define NAME_SIZE 17 //include '\0'
 #define FEE_SIZE 6
 #define LCD_LENGTH 16
+#define INFO_DISPLAY_TIME 5 // return to home screen after display info (name, fee...)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -79,35 +80,20 @@ uint8_t str_id[ID_SIZE*2 + 1];
 uint8_t Rx_data[UART_BUFFER_SIZE];
 uint8_t Tx_data[UART_BUFFER_SIZE];
 
-void displayHomeCreen() {
+Display_mode displayHomeScreen() {
 	lcd_clear_display();
 	HAL_Delay(50);
 	lcd_goto_XY(1, 0);
 	lcd_send_string("SCAN HERE");
-}
-
-void convertStringToHexId(uint8_t* str, uint8_t* id) {
-	for(uint8_t i = 0, j = 0; i < ID_SIZE; i++, j+=2) {
-		// first character
-		if(str[j] >= '0' && str[j] <= '9')
-			id[i] = ((str[j] - '0') << 4);
-		else
-			id[i] = ((str[j] - 'a' + 10) << 4);
-
-		// second character
-		if(str[j+1] >= '0' && str[j+1] <= '9')
-			id[i] += str[j+1] - '0';
-		else
-			id[i] += str[j+1] - 'a' + 10;
-	}
+	return DM_HOME_SCREEN;
 }
 
 void onOpen(uint8_t* Rx_data) {
 	uint8_t name[NAME_SIZE];
 	uint8_t fee[FEE_SIZE];
 	uint8_t buf[17];
-	getKey(Rx_data, "name=", name);
-	getKey(Rx_data, "fee=", fee);
+	getParameter(Rx_data, "name=", name);
+	getParameter(Rx_data, "fee=", fee);
 	sprintf((char*)buf, "Fee: %s", fee);
 
 	lcd_clear_display();
@@ -120,11 +106,13 @@ void onOpen(uint8_t* Rx_data) {
 
 void onDeny(uint8_t* Rx_data) {
 	uint8_t reason[LCD_LENGTH+1];
-	getKey(Rx_data, "reason=", reason);
+	getParameter(Rx_data, "reason=", reason);
 
 	lcd_clear_display();
 	HAL_Delay(50);
 	lcd_goto_XY(1, 0);
+	lcd_send_string("ACCESS DENY");
+	lcd_goto_XY(2, 0);
 	lcd_send_string((char*)reason);
 }
 
@@ -135,9 +123,9 @@ Write_Status onWrite() {
 	uint8_t isTimeOut = 0;
 	uint8_t countDot = 0;
 
-	getKey(Rx_data, "username=", username);
+	getParameter(Rx_data, "username=", username);
 
-	getKey(Rx_data, "id=", str_id);
+	getParameter(Rx_data, "id=", str_id);
 	convertStringToHexId(str_id, id);
 
 	lcd_clear_display();
@@ -185,7 +173,7 @@ Write_Status onWrite() {
 
 Read_State onRead(uint32_t* readTime) {
 	if(readID(id) != RFID_OK)
-		return RS_Reading; // read again
+		return RS_READING; // read again
 
   convertToString(id, str_id);
   sprintf((char*)Tx_data, "cmd=read&id=%s",(char*)str_id);
@@ -202,10 +190,10 @@ Read_State onWait(uint32_t readTime) {
 	lcd_goto_XY(2, 0);
 	while(readState == RS_WAIT && HAL_GetTick() - readTime < 20*1000 ) {
 		count++;
-		if(count == 12) {
+		if(count == 16) {
 			count = 0;
 			lcd_goto_XY(2, 0);
-			lcd_send_string("            ");
+			lcd_send_string("                ");
 			lcd_goto_XY(2, 0);
 		}
 
@@ -217,8 +205,8 @@ Read_State onWait(uint32_t readTime) {
 	// time out
 	if(readState == RS_WAIT) {
 		lcd_goto_XY(2, 0);
-		lcd_send_string("            ");
-		return RS_Reading;
+		lcd_send_string("                ");
+		return RS_READING;
 	}
 
 	return RS_RESPONSE;
@@ -226,23 +214,23 @@ Read_State onWait(uint32_t readTime) {
 
 Read_State onResponse() {
 	uint8_t cmd[CMD_SIZE];
-	getKey(Rx_data, "cmd=", cmd);
+	getParameter(Rx_data, "cmd=", cmd);
 
 	if(strcmp((char*)cmd, "open") == 0)
 		onOpen(Rx_data);
 	else if(strcmp((char*)cmd, "deny") == 0)
 		onDeny(Rx_data);
 
-	return RS_Reading;
+	return RS_READING;
 }
 
-
+// UART interrupt
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
     // handle interrupt here
 	Rx_data[Size] = '\0'; // ESP32 serial printf ignore the \0, so we have to add it manually
 	uint8_t cmd[CMD_SIZE];
-	getKey(Rx_data, "cmd=", cmd);
+	getParameter(Rx_data, "cmd=", cmd);
 
 	if(strcmp((char*)cmd, "write") == 0)
 		mode = SYS_WRITE;
@@ -288,18 +276,19 @@ int main(void)
   MX_I2C1_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
+
+  // using UART in IDLE DMA mode (https://tapit.vn/huong-dan-su-dung-chuc-nang-uart-idle-dma)
   HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, Rx_data, UART_BUFFER_SIZE);
   __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
 
   lcd_init();
-  displayHomeCreen();
   RFID_Init();
 
   uint32_t readTime;
   uint32_t displayTime;
   mode = SYS_READ;
-  readState = RS_Reading;
-  uint8_t displayDone = 1;
+  readState = RS_READING;
+  Display_mode displayMode = displayHomeScreen();;
 
   /* USER CODE END 2 */
 
@@ -311,28 +300,26 @@ int main(void)
 	  if(mode == SYS_WRITE) {
 		  onWrite();
 		  mode = SYS_READ;
-		  readState = RS_Reading;
+		  readState = RS_READING;
 		  displayTime = HAL_GetTick();
-		  displayDone = 0;
+		  displayMode = DM_INFO;
 	  }
 	  else {
 		  // reading mode
-		  if(readState == RS_Reading)
+		  if(readState == RS_READING)
 			  readState = onRead(&readTime);
 		  else if(readState == RS_WAIT)
 			  readState = onWait(readTime);
 		  else if(readState == RS_RESPONSE) {
 			  readState = onResponse();
 			  displayTime = HAL_GetTick();
-			  displayDone = 0;
+			  displayMode = DM_INFO;
 		  }
 	  }
 
-	  // clear the screen after 5 second
-	  if(!displayDone && HAL_GetTick() - displayTime > 5*1000) {
-		  displayHomeCreen();
-		  displayDone = 1;
-	  }
+	  // return to screen 5 second after display info
+	  if(displayMode != DM_HOME_SCREEN && HAL_GetTick() - displayTime > INFO_DISPLAY_TIME*1000)
+		  displayMode = displayHomeScreen();
 
     /* USER CODE END WHILE */
 
