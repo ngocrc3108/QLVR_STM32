@@ -64,7 +64,17 @@ void Error_Handler(void);
 #define BUTTON_Pin GPIO_PIN_15
 #define BUTTON_GPIO_Port GPIOB
 
+typedef enum {
+	SYS_READ = 0,
+	SYS_WRITE,
+	SYS_WAIT,
+	SYS_RESPONSE
+} SYS_State;
+
 /* USER CODE BEGIN Private defines */
+SYS_State onRead(uint32_t* readTime);
+SYS_State onWait(uint32_t readTime);
+SYS_State onResponse();
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

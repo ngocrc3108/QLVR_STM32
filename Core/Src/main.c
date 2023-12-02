@@ -18,7 +18,6 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -35,7 +34,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define RX_BUFFER_SIZE 100
+#define UART_BUFFER_SIZE 100
 #define ESP32_UART huart1
 #define HDMA_ESP32_UART_RX hdma_usart1_rx
 #define CMD_SIZE 20
@@ -57,20 +56,6 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_rx;
 
-/* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for myTask02 */
-osThreadId_t myTask02Handle;
-const osThreadAttr_t myTask02_attributes = {
-  .name = "myTask02",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
 /* USER CODE BEGIN PV */
 /* USER CODE END PV */
 
@@ -81,19 +66,24 @@ static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
-void StartDefaultTask(void *argument);
-void StartTask02(void *argument);
-
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-//656453c15c8b1513e1d70c8e
+SYS_State state;
 uint8_t id[ID_SIZE + 1];
 uint8_t str_id[ID_SIZE*2 + 1];
-uint8_t Rx_data[RX_BUFFER_SIZE];
+uint8_t Rx_data[UART_BUFFER_SIZE];
+uint8_t Tx_data[UART_BUFFER_SIZE];
+
+void displayHomeCreen() {
+	lcd_clear_display();
+	HAL_Delay(50);
+	lcd_goto_XY(1, 0);
+	lcd_send_string("SCAN HERE");
+}
 
 void convertStringToHexId(uint8_t* str, uint8_t* id) {
 	for(uint8_t i = 0, j = 0; i < ID_SIZE; i++, j+=2) {
@@ -118,13 +108,25 @@ void onOpen(uint8_t* Rx_data) {
 	getKey(Rx_data, "name=", name);
 	getKey(Rx_data, "fee=", fee);
 	sprintf((char*)buf, "Fee: %s", fee);
+
+	lcd_clear_display();
+	HAL_Delay(50);
 	lcd_goto_XY(1, 0);
 	lcd_send_string((char*)name);
 	lcd_goto_XY(2, 0);
 	lcd_send_string((char*)buf);
 }
 
-void onWrite(uint8_t* Rx_data) {
+void onDeny(uint8_t* Rx_data) {
+	uint8_t reason[LCD_LENGTH+1];
+	getKey(Rx_data, "reason=", reason);
+
+	lcd_clear_display();
+	lcd_goto_XY(1, 0);
+	lcd_send_string((char*)reason);
+}
+
+SYS_State onWrite() {
 	uint8_t username[LCD_LENGTH + 1];
 	//uint8_t* buf[LCD_LENGTH + 1];
 	uint8_t count = 0;
@@ -134,9 +136,10 @@ void onWrite(uint8_t* Rx_data) {
 	convertStringToHexId(str_id, id);
 
 	lcd_clear_display();
+	HAL_Delay(50);
 
 	lcd_goto_XY(1, 0);
-	lcd_send_string("  Link Tag"); //in ra bi mat 2 chu dau????
+	lcd_send_string("Link Tag");
 
 	lcd_goto_XY(2, 0);
 	lcd_send_string((char*)username);
@@ -148,30 +151,64 @@ void onWrite(uint8_t* Rx_data) {
 			count = 0;
 		}
 	}
+
+	return SYS_READ;
 }
 
-uint8_t commandHandle(uint8_t* Rx_data, uint16_t Size) {
-	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+SYS_State onRead(uint32_t* readTime) {
+	if(readID(id) != RFID_OK)
+		return SYS_READ; // read again
 
+  convertToString(id, str_id);
+  sprintf((char*)Tx_data, "cmd=read&id=%s",(char*)str_id);
+
+  HAL_UART_Transmit(&ESP32_UART, Tx_data, strlen((char*)Tx_data), 100);
+
+  *readTime = HAL_GetTick();
+
+  return SYS_WAIT; // wait for response
+}
+
+SYS_State onWait(uint32_t readTime) {
+	while(state == SYS_WAIT && HAL_GetTick() - readTime < 20*1000 ) {
+		HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+		HAL_Delay(100);
+	}
+
+	// time out
+	if(state == SYS_WAIT)
+		return SYS_READ;
+
+	return SYS_RESPONSE;
+}
+
+SYS_State onResponse() {
 	uint8_t cmd[CMD_SIZE];
-	Rx_data[Size] = '\0'; // ESP32 serial printf ignore the \0, so we have to add it manually
 	getKey(Rx_data, "cmd=", cmd);
 
 	if(strcmp((char*)cmd, "open") == 0)
 		onOpen(Rx_data);
-	else if(strcmp((char*)cmd, "write") == 0)
-		onWrite(Rx_data);
+	else if(strcmp((char*)cmd, "deny") == 0)
+		onDeny(Rx_data);
 
-	return 0;
+	return SYS_READ;
 }
+
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
     // handle interrupt here
-	commandHandle(Rx_data, Size);
+	Rx_data[Size] = '\0'; // ESP32 serial printf ignore the \0, so we have to add it manually
+	uint8_t cmd[CMD_SIZE];
+	getKey(Rx_data, "cmd=", cmd);
+
+	if(strcmp((char*)cmd, "write") == 0)
+		state = SYS_WRITE;
+	else if(state == SYS_WAIT)
+		state = SYS_RESPONSE;
 
 	// enable receive in dma mode again
-    HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, Rx_data, RX_BUFFER_SIZE);
+    HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, Rx_data, UART_BUFFER_SIZE);
     __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
 }
 
@@ -209,56 +246,45 @@ int main(void)
   MX_I2C1_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-  HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, Rx_data, RX_BUFFER_SIZE);
+  HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, Rx_data, UART_BUFFER_SIZE);
   __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
 
   lcd_init();
+  displayHomeCreen();
   RFID_Init();
+
+  uint32_t readTime;
+  uint32_t responseTime;
+  state = SYS_READ;
+  uint8_t done = 1;
 
   /* USER CODE END 2 */
 
-  /* Init scheduler */
-  osKernelInitialize();
-
-  /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
-  /* USER CODE END RTOS_MUTEX */
-
-  /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
-  /* USER CODE END RTOS_SEMAPHORES */
-
-  /* USER CODE BEGIN RTOS_TIMERS */
-  /* start timers, add new ones, ... */
-  /* USER CODE END RTOS_TIMERS */
-
-  /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
-  /* USER CODE END RTOS_QUEUES */
-
-  /* Create the thread(s) */
-  /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-
-  /* creation of myTask02 */
-  myTask02Handle = osThreadNew(StartTask02, NULL, &myTask02_attributes);
-
-  /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
-
-  /* USER CODE BEGIN RTOS_EVENTS */
-  /* add events, ... */
-  /* USER CODE END RTOS_EVENTS */
-
-  /* Start scheduler */
-  osKernelStart();
-
-  /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  if(state == SYS_READ)
+		  state = onRead(&readTime);
+
+	  if(state == SYS_WAIT)
+		  state = onWait(readTime);
+
+	  if(state == SYS_RESPONSE) {
+		  state = onResponse();
+		  responseTime = HAL_GetTick();
+		  done = 0;
+	  }
+
+	  if(state == SYS_WRITE)
+		  state = onWrite();
+
+	  if(!done && HAL_GetTick() - responseTime > 5*1000) {
+		  displayHomeCreen();
+		  done = 1;
+	  }
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -421,7 +447,7 @@ static void MX_DMA_Init(void)
 
   /* DMA interrupt init */
   /* DMA1_Channel5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 5, 0);
+  HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
 
 }
@@ -486,73 +512,6 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
-
-/* USER CODE BEGIN Header_StartDefaultTask */
-/**
-  * @brief  Function implementing the defaultTask thread.
-  * @param  argument: Not used
-  * @retval None
-  */
-/* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
-{
-  /* USER CODE BEGIN 5 */
-  //uint8_t uart_buf[RX_BUFFER_SIZE];
-  //RFID_Status writeOK = RFID_WRITE_ERR;
-  /* Infinite loop */
-  for(;;)
-  {
-//	  if(readID(id) == RFID_OK) {
-//		  convertToString(id, str_id);
-//		  sprintf((char*)uart_buf, "cmd=read&id=%s",(char*)str_id);
-//		  HAL_UART_Transmit(&ESP32_UART, uart_buf, strlen((char*)uart_buf), 100);
-//  	  }
-  }
-  /* USER CODE END 5 */
-}
-
-/* USER CODE BEGIN Header_StartTask02 */
-/**
-* @brief Function implementing the myTask02 thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartTask02 */
-void StartTask02(void *argument)
-{
-  /* USER CODE BEGIN StartTask02 */
-  /* Infinite loop */
-  for(;;)
-  {
-//	  lcd_clear_display();
-//	  lcd_goto_XY(1, 0);
-//	  lcd_send_string("scan here");
-//	  HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
-//	  osDelay(10000);
-  }
-  /* USER CODE END StartTask02 */
-}
-
-/**
-  * @brief  Period elapsed callback in non blocking mode
-  * @note   This function is called  when TIM3 interrupt took place, inside
-  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
-  * a global variable "uwTick" used as application time base.
-  * @param  htim : TIM handle
-  * @retval None
-  */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-  /* USER CODE BEGIN Callback 0 */
-
-  /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM3) {
-    HAL_IncTick();
-  }
-  /* USER CODE BEGIN Callback 1 */
-
-  /* USER CODE END Callback 1 */
-}
 
 /**
   * @brief  This function is executed in case of error occurrence.

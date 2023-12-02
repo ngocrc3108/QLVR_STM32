@@ -19,7 +19,8 @@
 typedef enum {
 	RFID_OK = 0,
 	RFID_WRITE_ERR = 1,
-	RFID_READ_ERR = 2
+	RFID_READ_ERR = 2,
+	RFID_WAIT_ERR = 3
 } RFID_Status;
 
 extern void RFID_Init();
