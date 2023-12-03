@@ -64,6 +64,17 @@ void Error_Handler(void);
 #define BUTTON_Pin GPIO_PIN_15
 #define BUTTON_GPIO_Port GPIOB
 
+/* USER CODE BEGIN Private defines */
+#define UART_BUFFER_SIZE 100
+#define ESP32_UART huart1
+#define HDMA_ESP32_UART_RX hdma_usart1_rx
+#define CMD_SIZE 20
+#define NAME_SIZE 17 //include '\0'
+#define FEE_SIZE 6
+#define LCD_LENGTH 16
+#define INFO_DISPLAY_TIME 5 // return to home screen after display info (name, fee...)
+#define WAIT_TIME 10
+
 typedef enum {
 	SYS_READ,
 	SYS_WRITE
@@ -85,12 +96,10 @@ typedef enum {
 	DM_INFO
 } Display_mode;
 
-/* USER CODE BEGIN Private defines */
-
 // function for check-in/check-out
 Read_State onRead(uint32_t* readTime);
-Read_State onWait(uint32_t readTime); // wait for reading response (open or deny)
-Read_State onResponse();
+Read_State onWait(uint32_t readTime, Display_mode* displayMode, uint32_t* displayTime); // wait for reading response (open or deny)
+Read_State onResponse(Display_mode* displayMode, uint32_t* displayTime);
 void onOpen(uint8_t* Rx_data);
 void onDeny(uint8_t* Rx_data);
 
