@@ -34,14 +34,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define UART_BUFFER_SIZE 100
-#define ESP32_UART huart1
-#define HDMA_ESP32_UART_RX hdma_usart1_rx
-#define CMD_SIZE 20
-#define NAME_SIZE 17 //include '\0'
-#define FEE_SIZE 6
-#define LCD_LENGTH 16
-#define INFO_DISPLAY_TIME 5 // return to home screen after display info (name, fee...)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -185,10 +177,10 @@ Read_State onRead(uint32_t* readTime) {
 	return RS_WAIT; // wait for response
 }
 
-Read_State onWait(uint32_t readTime) {
+Read_State onWait(uint32_t readTime, Display_mode* displayMode, uint32_t* displayTime) {
 	uint8_t count = 0;
 	lcd_goto_XY(2, 0);
-	while(readState == RS_WAIT && HAL_GetTick() - readTime < 20*1000 ) {
+	while(readState == RS_WAIT && HAL_GetTick() - readTime < WAIT_TIME*1000 ) {
 		count++;
 		if(count == 16) {
 			count = 0;
@@ -205,14 +197,16 @@ Read_State onWait(uint32_t readTime) {
 	// time out
 	if(readState == RS_WAIT) {
 		lcd_goto_XY(2, 0);
-		lcd_send_string("                ");
+		lcd_send_string("TIMEOUT         ");
+		*displayMode = DM_INFO;
+		*displayTime = HAL_GetTick();
 		return RS_READING;
 	}
 
 	return RS_RESPONSE;
 }
 
-Read_State onResponse() {
+Read_State onResponse(Display_mode* displayMode, uint32_t* displayTime) {
 	uint8_t cmd[CMD_SIZE];
 	getParameter(Rx_data, "cmd=", cmd);
 
@@ -220,6 +214,9 @@ Read_State onResponse() {
 		onOpen(Rx_data);
 	else if(strcmp((char*)cmd, "deny") == 0)
 		onDeny(Rx_data);
+
+	*displayTime = HAL_GetTick();
+	*displayMode = DM_INFO;
 
 	return RS_READING;
 }
@@ -296,11 +293,15 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  // writing mode is determined by UART interrupt
+	  // writing mode is determined by UART interrupt.
 	  if(mode == SYS_WRITE) {
 		  onWrite();
+
+		  // after write id, change mode back to read.
 		  mode = SYS_READ;
 		  readState = RS_READING;
+
+		  // mark the time to compare later (return to home screen after some time).
 		  displayTime = HAL_GetTick();
 		  displayMode = DM_INFO;
 	  }
@@ -309,15 +310,13 @@ int main(void)
 		  if(readState == RS_READING)
 			  readState = onRead(&readTime);
 		  else if(readState == RS_WAIT)
-			  readState = onWait(readTime);
+			  readState = onWait(readTime, &displayMode, &displayTime);
 		  else if(readState == RS_RESPONSE) {
-			  readState = onResponse();
-			  displayTime = HAL_GetTick();
-			  displayMode = DM_INFO;
+			  readState = onResponse(&displayMode, &displayTime);
 		  }
 	  }
 
-	  // return to screen 5 second after display info
+	  // return to home screen 5 second after display info
 	  if(displayMode != DM_HOME_SCREEN && HAL_GetTick() - displayTime > INFO_DISPLAY_TIME*1000)
 		  displayMode = displayHomeScreen();
 
