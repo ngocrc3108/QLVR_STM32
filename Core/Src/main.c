@@ -83,16 +83,25 @@ Display_mode displayHomeScreen() {
 void onOpen(uint8_t* Rx_data) {
 	uint8_t name[NAME_SIZE];
 	uint8_t fee[FEE_SIZE];
+	uint8_t dir[5]; // in or out
 	uint8_t buf[17];
+
 	getParameter(Rx_data, "name=", name);
-	getParameter(Rx_data, "fee=", fee);
-	sprintf((char*)buf, "Fee: %s", fee);
+	getParameter(Rx_data, "dir=", dir);
 
 	lcd_clear_display();
 	HAL_Delay(50);
 	lcd_goto_XY(1, 0);
 	lcd_send_string((char*)name);
 	lcd_goto_XY(2, 0);
+
+	if(strcmp((char*)dir, "out") == 0) {
+		getParameter(Rx_data, "fee=", fee);
+		sprintf((char*)buf, "OUT: %s", fee);
+	}
+	else
+		sprintf((char*)buf, "IN: ---");
+
 	lcd_send_string((char*)buf);
 }
 
