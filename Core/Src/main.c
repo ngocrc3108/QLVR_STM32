@@ -71,19 +71,12 @@ static void MX_TIM3_Init(void);
 /* USER CODE BEGIN 0 */
 Sys_Mode mode;
 Read_State readState;
-<<<<<<< HEAD
-uint8_t id[ID_SIZE + 1] = {0xEE, 0xEE, 0xEE};
-uint8_t str_id[ID_SIZE*2 + 1];
-uint8_t Rx_data[UART_BUFFER_SIZE];
-uint8_t Tx_data[UART_BUFFER_SIZE];
-uint8_t servoPinValue = 1;
-=======
 char id[ID_SIZE + 1] = {0xEE, 0xEE, 0xEE};
 char str_id[ID_SIZE*2+1];
 char Rx_data[UART_BUFFER_SIZE];
 char Tx_data[UART_BUFFER_SIZE];
 Display display;
->>>>>>> main
+uint8_t servoPinValue = 1;
 
 void onOpen(char* Rx_data) {
 	char name[NAME_SIZE];
