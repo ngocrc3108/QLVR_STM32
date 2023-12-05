@@ -31,6 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "i2c-lcd.h"
 
 /* USER CODE END Includes */
 
@@ -71,7 +72,6 @@ void Error_Handler(void);
 #define CMD_SIZE 20
 #define NAME_SIZE 17 //include '\0'
 #define FEE_SIZE 6
-#define LCD_LENGTH 16
 #define INFO_DISPLAY_TIME 5 // return to home screen after display info (name, fee...)
 #define WAIT_TIME 10
 
@@ -90,11 +90,6 @@ typedef enum {
 	WRITE_OK = 0,
 	WRITE_TIMEOUT
 } Write_Status;
-
-typedef enum {
-	DM_HOME_SCREEN,
-	DM_INFO
-} Display_mode;
 
 // function for check-in/check-out
 Read_State onRead(uint32_t* readTime);
