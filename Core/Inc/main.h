@@ -61,12 +61,15 @@ void Error_Handler(void);
 #define LED3_GPIO_Port GPIOC
 #define LED2_Pin GPIO_PIN_11
 #define LED2_GPIO_Port GPIOB
+#define SERVO_Pin GPIO_PIN_14
+#define SERVO_GPIO_Port GPIOB
 #define BUTTON_Pin GPIO_PIN_15
 #define BUTTON_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 #define UART_BUFFER_SIZE 100
 #define ESP32_UART huart1
+#define SERVO_TIMER htim3
 #define HDMA_ESP32_UART_RX hdma_usart1_rx
 #define CMD_SIZE 20
 #define NAME_SIZE 17 //include '\0'
