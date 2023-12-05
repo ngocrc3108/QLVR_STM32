@@ -1,6 +1,6 @@
 #include "query_string.h"
 
-Get_Parameter_Status getParameter(uint8_t* queryString, const char* parameterName, uint8_t* value) {
+Get_Parameter_Status getParameter(const char* queryString, const char* parameterName, char* value) {
     uint8_t* temp = NULL;
     temp = (uint8_t*)strstr((char*)queryString, parameterName);
     if (temp == NULL)

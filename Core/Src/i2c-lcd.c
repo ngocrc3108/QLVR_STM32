@@ -7,6 +7,48 @@ extern I2C_HandleTypeDef hi2c1;  // change your handler here accordingly
 
 #define SLAVE_ADDRESS_LCD 0x7E // change this according to ur setup
 
+void lcdInit(Display* display) {
+	lcd_init();
+	display->mode = lcdDipsplayHomeScreen();
+	display->time = 0;
+}
+
+Display_mode lcdDipsplayHomeScreen() {
+	lcd_clear_display();
+	HAL_Delay(50);
+	lcd_goto_XY(1, 0);
+	lcd_send_string("SCAN HERE");
+	return DM_HOME_SCREEN;
+}
+
+void lcdPrintInfo(Display* display, const char* str) {
+	char buf[LCD_LENGTH + 1];
+	lcd_goto_XY(2, 0);
+
+	strcpy(buf, str);
+
+	for(uint8_t i = strlen(str); i < LCD_LENGTH; i++)
+		buf[i] = ' ';
+	buf[LCD_LENGTH] = '\0';
+
+	lcd_send_string(buf);
+	display->mode = DM_INFO;
+	display->time = HAL_GetTick();
+}
+
+void lcdPrintTitle(Display* display, const char* str) {
+	char buf[LCD_LENGTH + 1];
+	lcd_goto_XY(1, 0);
+
+	strcpy(buf, str);
+
+	for(uint8_t i = strlen(str); i < LCD_LENGTH; i++)
+		buf[i] = ' ';
+	buf[LCD_LENGTH] = '\0';
+
+	lcd_send_string(buf);
+}
+
 void lcd_send_cmd (char cmd)
 {
   char data_u, data_l;
