@@ -102,7 +102,7 @@ RFID_Status writeID(const char* id) {
 		if(tryCount >= 10) {
 			TM_MFRC522_Halt();
 			TM_MFRC522_ClearBitMask(MFRC522_REG_STATUS2, 0x08);
-			return RFID_WRITE_SECTOR_ERR;
+			return RFID_AUTH_ERR;
 		}
 	}
 
@@ -120,7 +120,7 @@ RFID_Status readID(char* id) {
 	TM_MFRC522_SelectTag(buff);
 
 	if(TM_MFRC522_Auth(PICC_AUTHENT1A, ID_SECTOR_BLOCK, sysSectorKey, buff) != MI_OK)
-		return RFID_WRITE_DATA_ERR;
+		return RFID_AUTH_ERR;
 
 	uint8_t data[BLOCK_SIZE];
 

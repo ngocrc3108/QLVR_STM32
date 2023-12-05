@@ -172,8 +172,13 @@ Write_Status onWrite() {
 	return WRITE_OK;
 }
 
-Read_State onRead(uint32_t* readTime) {
-	if(readID(id) != RFID_OK)
+Read_State onRead(uint32_t* readTime, Display* display) {
+	RFID_Status status = readID(id);
+
+	if(status == RFID_AUTH_ERR)
+		displayInfo(display, "WRONG CARD");
+
+	if(status != RFID_OK)
 		return RS_READING; // read again
 
 	convertToString(id, str_id);
@@ -186,7 +191,7 @@ Read_State onRead(uint32_t* readTime) {
 	return RS_WAIT; // wait for response
 }
 
-Read_State onWait(uint32_t readTime, Display_mode* displayMode, uint32_t* displayTime) {
+Read_State onWait(uint32_t readTime, Display* display) {
 	uint8_t count = 0;
 	lcd_goto_XY(2, 0);
 	while(readState == RS_WAIT && HAL_GetTick() - readTime < WAIT_TIME*1000 ) {
@@ -207,15 +212,15 @@ Read_State onWait(uint32_t readTime, Display_mode* displayMode, uint32_t* displa
 	if(readState == RS_WAIT) {
 		lcd_goto_XY(2, 0);
 		lcd_send_string("TIMEOUT         ");
-		*displayMode = DM_INFO;
-		*displayTime = HAL_GetTick();
+		display->mode = DM_INFO;
+		display->time = HAL_GetTick();
 		return RS_READING;
 	}
 
 	return RS_RESPONSE;
 }
 
-Read_State onResponse(Display_mode* displayMode, uint32_t* displayTime) {
+Read_State onResponse(Display* display) {
 	char cmd[CMD_SIZE];
 	getParameter(Rx_data, "cmd=", cmd);
 
@@ -224,8 +229,8 @@ Read_State onResponse(Display_mode* displayMode, uint32_t* displayTime) {
 	else if(strcmp(cmd, "deny") == 0)
 		onDeny(Rx_data);
 
-	*displayTime = HAL_GetTick();
-	*displayMode = DM_INFO;
+	display->mode = DM_INFO;
+	display->time = HAL_GetTick();
 
 	return RS_READING;
 }
@@ -290,11 +295,13 @@ int main(void)
   lcd_init();
   RFID_Init();
 
+  Display display;
+  display.mode = displayHomeScreen();
+  display.time = 0;
+
   uint32_t readTime;
-  uint32_t displayTime;
   mode = SYS_READ;
   readState = RS_READING;
-  Display_mode displayMode = displayHomeScreen();
 
   /* USER CODE END 2 */
 
@@ -311,23 +318,22 @@ int main(void)
 		  readState = RS_READING;
 
 		  // mark the time to compare later (return to home screen after some time).
-		  displayTime = HAL_GetTick();
-		  displayMode = DM_INFO;
+		  display.time = HAL_GetTick();
 	  }
 	  else {
 		  // reading mode
 		  if(readState == RS_READING)
-			  readState = onRead(&readTime);
+			  readState = onRead(&readTime, &display);
 		  else if(readState == RS_WAIT)
-			  readState = onWait(readTime, &displayMode, &displayTime);
+			  readState = onWait(readTime, &display);
 		  else if(readState == RS_RESPONSE) {
-			  readState = onResponse(&displayMode, &displayTime);
+			  readState = onResponse(&display);
 		  }
 	  }
 
 	  // return to home screen 5 second after display info
-	  if(displayMode != DM_HOME_SCREEN && HAL_GetTick() - displayTime > INFO_DISPLAY_TIME*1000)
-		  displayMode = displayHomeScreen();
+	  if(display.mode != DM_HOME_SCREEN && HAL_GetTick() - display.time > INFO_DISPLAY_TIME*1000)
+		  display.mode = displayHomeScreen();
 
     /* USER CODE END WHILE */
 

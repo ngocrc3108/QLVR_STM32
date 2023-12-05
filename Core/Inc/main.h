@@ -92,9 +92,9 @@ typedef enum {
 } Write_Status;
 
 // function for check-in/check-out
-Read_State onRead(uint32_t* readTime);
-Read_State onWait(uint32_t readTime, Display_mode* displayMode, uint32_t* displayTime); // wait for reading response (open or deny)
-Read_State onResponse(Display_mode* displayMode, uint32_t* displayTime);
+Read_State onRead(uint32_t* readTime, Display* display);
+Read_State onWait(uint32_t readTime, Display* display); // wait for reading response (open or deny)
+Read_State onResponse(Display* display);
 void onOpen(char* Rx_data);
 void onDeny(char* Rx_data);
 
