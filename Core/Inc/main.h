@@ -95,8 +95,8 @@ typedef enum {
 Read_State onRead(uint32_t* readTime);
 Read_State onWait(uint32_t readTime, Display_mode* displayMode, uint32_t* displayTime); // wait for reading response (open or deny)
 Read_State onResponse(Display_mode* displayMode, uint32_t* displayTime);
-void onOpen(uint8_t* Rx_data);
-void onDeny(uint8_t* Rx_data);
+void onOpen(char* Rx_data);
+void onDeny(char* Rx_data);
 
 // function for linking user account to a RFID tag
 Write_Status onWrite();

@@ -67,10 +67,10 @@ static void MX_SPI1_Init(void);
 /* USER CODE BEGIN 0 */
 Sys_Mode mode;
 Read_State readState;
-uint8_t id[ID_SIZE + 1] = {0xEE, 0xEE, 0xEE};
-uint8_t str_id[ID_SIZE*2 + 1];
-uint8_t Rx_data[UART_BUFFER_SIZE];
-uint8_t Tx_data[UART_BUFFER_SIZE];
+char id[ID_SIZE + 1] = {0xEE, 0xEE, 0xEE};
+char str_id[ID_SIZE*2 + 1];
+char Rx_data[UART_BUFFER_SIZE];
+char Tx_data[UART_BUFFER_SIZE];
 
 Display_mode displayHomeScreen() {
 	lcd_clear_display();
@@ -80,11 +80,11 @@ Display_mode displayHomeScreen() {
 	return DM_HOME_SCREEN;
 }
 
-void onOpen(uint8_t* Rx_data) {
-	uint8_t name[NAME_SIZE];
-	uint8_t fee[FEE_SIZE];
-	uint8_t dir[5]; // in or out
-	uint8_t buf[17];
+void onOpen(char* Rx_data) {
+	char name[NAME_SIZE];
+	char fee[FEE_SIZE];
+	char dir[5]; // in or out
+	char buf[17];
 
 	getParameter(Rx_data, "name=", name);
 	getParameter(Rx_data, "dir=", dir);
@@ -92,21 +92,21 @@ void onOpen(uint8_t* Rx_data) {
 	lcd_clear_display();
 	HAL_Delay(50);
 	lcd_goto_XY(1, 0);
-	lcd_send_string((char*)name);
+	lcd_send_string(name);
 	lcd_goto_XY(2, 0);
 
-	if(strcmp((char*)dir, "out") == 0) {
+	if(strcmp(dir, "out") == 0) {
 		getParameter(Rx_data, "fee=", fee);
-		sprintf((char*)buf, "OUT: %s", fee);
+		sprintf(buf, "OUT: %s", fee);
 	}
 	else
-		sprintf((char*)buf, "IN: ---");
+		sprintf(buf, "IN: ---");
 
-	lcd_send_string((char*)buf);
+	lcd_send_string(buf);
 }
 
-void onDeny(uint8_t* Rx_data) {
-	uint8_t reason[LCD_LENGTH+1];
+void onDeny(char* Rx_data) {
+	char reason[LCD_LENGTH+1];
 	getParameter(Rx_data, "reason=", reason);
 
 	lcd_clear_display();
@@ -118,7 +118,7 @@ void onDeny(uint8_t* Rx_data) {
 }
 
 Write_Status onWrite() {
-	uint8_t username[LCD_LENGTH + 1];
+	char username[LCD_LENGTH + 1];
 	uint8_t count = 0;
 	uint32_t startTime = HAL_GetTick();
 	uint8_t isTimeOut = 0;
@@ -136,7 +136,7 @@ Write_Status onWrite() {
 	lcd_send_string("LINK TAG");
 
 	lcd_goto_XY(2, 0);
-	lcd_send_string((char*)username);
+	lcd_send_string(username);
 
 	lcd_goto_XY(1, 9);
 
@@ -165,8 +165,8 @@ Write_Status onWrite() {
 	}
 	else {
 	  lcd_send_string("LINK TAG OK     ");
-	  sprintf((char*)Tx_data, "cmd=writeRes&status=ok&id=%s", str_id);
-	  HAL_UART_Transmit(&ESP32_UART, Tx_data, strlen((char*)Tx_data), 100);
+	  sprintf(Tx_data, "cmd=writeRes&status=ok&id=%s", str_id);
+	  HAL_UART_Transmit(&ESP32_UART, (uint8_t*)Tx_data, strlen(Tx_data), 100);
 	}
 
 	return WRITE_OK;
@@ -177,9 +177,9 @@ Read_State onRead(uint32_t* readTime) {
 		return RS_READING; // read again
 
 	convertToString(id, str_id);
-	sprintf((char*)Tx_data, "cmd=read&id=%s",(char*)str_id);
+	sprintf(Tx_data, "cmd=read&id=%s",str_id);
 
-	HAL_UART_Transmit(&ESP32_UART, Tx_data, strlen((char*)Tx_data), 100);
+	HAL_UART_Transmit(&ESP32_UART, (uint8_t*)Tx_data, strlen(Tx_data), 100);
 
 	*readTime = HAL_GetTick();
 
@@ -216,12 +216,12 @@ Read_State onWait(uint32_t readTime, Display_mode* displayMode, uint32_t* displa
 }
 
 Read_State onResponse(Display_mode* displayMode, uint32_t* displayTime) {
-	uint8_t cmd[CMD_SIZE];
+	char cmd[CMD_SIZE];
 	getParameter(Rx_data, "cmd=", cmd);
 
-	if(strcmp((char*)cmd, "open") == 0)
+	if(strcmp(cmd, "open") == 0)
 		onOpen(Rx_data);
-	else if(strcmp((char*)cmd, "deny") == 0)
+	else if(strcmp(cmd, "deny") == 0)
 		onDeny(Rx_data);
 
 	*displayTime = HAL_GetTick();
@@ -235,16 +235,16 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
     // handle interrupt here
 	Rx_data[Size] = '\0'; // ESP32 serial printf ignore the \0, so we have to add it manually
-	uint8_t cmd[CMD_SIZE];
+	char cmd[CMD_SIZE];
 	getParameter(Rx_data, "cmd=", cmd);
 
-	if(strcmp((char*)cmd, "write") == 0)
+	if(strcmp(cmd, "write") == 0)
 		mode = SYS_WRITE;
 	else if(readState == RS_WAIT)
 		readState = RS_RESPONSE;
 
 	// enable receive in dma mode again
-    HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, Rx_data, UART_BUFFER_SIZE);
+    HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, (uint8_t*)Rx_data, UART_BUFFER_SIZE);
     __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
 }
 
@@ -284,7 +284,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   // using UART in IDLE DMA mode (https://tapit.vn/huong-dan-su-dung-chuc-nang-uart-idle-dma)
-  HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, Rx_data, UART_BUFFER_SIZE);
+  HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, (uint8_t*)Rx_data, UART_BUFFER_SIZE);
   __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
 
   lcd_init();
