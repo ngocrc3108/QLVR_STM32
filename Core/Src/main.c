@@ -34,6 +34,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -68,17 +69,10 @@ static void MX_SPI1_Init(void);
 Sys_Mode mode;
 Read_State readState;
 char id[ID_SIZE + 1] = {0xEE, 0xEE, 0xEE};
-char str_id[ID_SIZE*2 + 1];
+char str_id[ID_SIZE*2+1];
 char Rx_data[UART_BUFFER_SIZE];
 char Tx_data[UART_BUFFER_SIZE];
-
-Display_mode displayHomeScreen() {
-	lcd_clear_display();
-	HAL_Delay(50);
-	lcd_goto_XY(1, 0);
-	lcd_send_string("SCAN HERE");
-	return DM_HOME_SCREEN;
-}
+Display display;
 
 void onOpen(char* Rx_data) {
 	char name[NAME_SIZE];
@@ -91,9 +85,7 @@ void onOpen(char* Rx_data) {
 
 	lcd_clear_display();
 	HAL_Delay(50);
-	lcd_goto_XY(1, 0);
-	lcd_send_string(name);
-	lcd_goto_XY(2, 0);
+	lcdPrintTitle(&display, name);
 
 	if(strcmp(dir, "out") == 0) {
 		getParameter(Rx_data, "fee=", fee);
@@ -102,7 +94,7 @@ void onOpen(char* Rx_data) {
 	else
 		sprintf(buf, "IN: ---");
 
-	lcd_send_string(buf);
+	lcdPrintInfo(&display, buf);
 }
 
 void onDeny(char* Rx_data) {
@@ -111,18 +103,17 @@ void onDeny(char* Rx_data) {
 
 	lcd_clear_display();
 	HAL_Delay(50);
-	lcd_goto_XY(1, 0);
-	lcd_send_string("ACCESS DENY");
-	lcd_goto_XY(2, 0);
-	lcd_send_string((char*)reason);
+	lcdPrintTitle(&display, "ACCESS DENY");
+	lcdPrintInfo(&display, reason);
 }
 
 Write_Status onWrite() {
 	char username[LCD_LENGTH + 1];
-	uint8_t count = 0;
-	uint32_t startTime = HAL_GetTick();
-	uint8_t isTimeOut = 0;
-	uint8_t countDot = 0;
+	uint32_t startTime;
+	uint32_t currentTime;
+	uint32_t toggleTime;
+	uint8_t isTimeOut;
+	uint8_t dotCount = 0;
 
 	getParameter(Rx_data, "username=", username);
 
@@ -132,51 +123,54 @@ Write_Status onWrite() {
 	lcd_clear_display();
 	HAL_Delay(50);
 
-	lcd_goto_XY(1, 0);
-	lcd_send_string("LINK TAG");
+	lcdPrintTitle(&display, "LINK TAG");
+	lcdPrintInfo(&display, username);
 
-	lcd_goto_XY(2, 0);
-	lcd_send_string(username);
+	startTime = HAL_GetTick();
+	toggleTime = startTime;
+	currentTime = startTime;
+	isTimeOut = 0;
 
 	lcd_goto_XY(1, 9);
-
 	while(writeID(id) != RFID_OK  && !isTimeOut) {
-		isTimeOut = HAL_GetTick() - startTime > 10*1000;
-		count++;
-		if(count == 20) {
-			count = 0;
-			countDot++;
-			if(countDot == 6) {
-				countDot = 0;
+		if(currentTime - toggleTime > TOGGLE_TIME_MS*2) {
+			toggleTime = currentTime;
+			HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+			lcd_send_string(".");
+			dotCount++;
+
+			if(dotCount == 8) {
+				dotCount = 0;
 				lcd_goto_XY(1, 9);
 				lcd_send_string("       ");
 				lcd_goto_XY(1, 9);
 			}
-			HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
-			lcd_send_string(".");
 		}
+		currentTime = HAL_GetTick();
+		isTimeOut = currentTime - startTime > 10*1000;
 	}
 
-	lcd_goto_XY(1, 0);
-
 	if(isTimeOut) {
-	  lcd_send_string("LINK TAG TIMEOUT");
+	  lcdPrintTitle(&display, "LINK TAG TIMEOUT");
 	  return WRITE_TIMEOUT;
 	}
 	else {
-	  lcd_send_string("LINK TAG OK     ");
+	  lcdPrintTitle(&display, "LINK TAG OK");
 	  sprintf(Tx_data, "cmd=writeRes&status=ok&id=%s", str_id);
 	  HAL_UART_Transmit(&ESP32_UART, (uint8_t*)Tx_data, strlen(Tx_data), 100);
 	}
 
+	display.time = HAL_GetTick();
+	display.mode = DM_INFO;
+
 	return WRITE_OK;
 }
 
-Read_State onRead(uint32_t* readTime, Display* display) {
+Read_State onRead(uint32_t* readTime) {
 	RFID_Status status = readID(id);
 
 	if(status == RFID_AUTH_ERR)
-		displayInfo(display, "WRONG CARD");
+		lcdPrintInfo(&display, "WRONG CARD");
 
 	if(status != RFID_OK)
 		return RS_READING; // read again
@@ -191,36 +185,38 @@ Read_State onRead(uint32_t* readTime, Display* display) {
 	return RS_WAIT; // wait for response
 }
 
-Read_State onWait(uint32_t readTime, Display* display) {
+Read_State onWait(uint32_t readTime) {
 	uint8_t count = 0;
-	lcd_goto_XY(2, 0);
-	while(readState == RS_WAIT && HAL_GetTick() - readTime < WAIT_TIME*1000 ) {
-		count++;
-		if(count == 16) {
-			count = 0;
-			lcd_goto_XY(2, 0);
-			lcd_send_string("                ");
-			lcd_goto_XY(2, 0);
-		}
+	uint32_t currentTime = HAL_GetTick();
+	uint32_t toggleTime = currentTime;
 
-		HAL_Delay(100);
-		HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
-		lcd_send_string(".");
+	lcd_goto_XY(2, 0);
+	while(readState == RS_WAIT && currentTime - readTime < WAIT_TIME*1000 ) {
+		if(currentTime - toggleTime > TOGGLE_TIME_MS) {
+			toggleTime = currentTime;
+			HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+			lcd_send_string(".");
+			count++;
+
+			if(count == 16) {
+				count = 0;
+				lcdPrintInfo(&display, "");
+				lcd_goto_XY(2, 0);
+			}
+		}
+		currentTime = HAL_GetTick(); //update current time.
 	}
 
 	// time out
 	if(readState == RS_WAIT) {
-		lcd_goto_XY(2, 0);
-		lcd_send_string("TIMEOUT         ");
-		display->mode = DM_INFO;
-		display->time = HAL_GetTick();
+		lcdPrintInfo(&display, "TIMEOUT");
 		return RS_READING;
 	}
 
 	return RS_RESPONSE;
 }
 
-Read_State onResponse(Display* display) {
+Read_State onResponse() {
 	char cmd[CMD_SIZE];
 	getParameter(Rx_data, "cmd=", cmd);
 
@@ -228,9 +224,6 @@ Read_State onResponse(Display* display) {
 		onOpen(Rx_data);
 	else if(strcmp(cmd, "deny") == 0)
 		onDeny(Rx_data);
-
-	display->mode = DM_INFO;
-	display->time = HAL_GetTick();
 
 	return RS_READING;
 }
@@ -292,12 +285,8 @@ int main(void)
   HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, (uint8_t*)Rx_data, UART_BUFFER_SIZE);
   __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
 
-  lcd_init();
+  lcdInit(&display);
   RFID_Init();
-
-  Display display;
-  display.mode = displayHomeScreen();
-  display.time = 0;
 
   uint32_t readTime;
   mode = SYS_READ;
@@ -316,24 +305,20 @@ int main(void)
 		  // after write id, change mode back to read.
 		  mode = SYS_READ;
 		  readState = RS_READING;
-
-		  // mark the time to compare later (return to home screen after some time).
-		  display.time = HAL_GetTick();
 	  }
 	  else {
 		  // reading mode
 		  if(readState == RS_READING)
-			  readState = onRead(&readTime, &display);
+			  readState = onRead(&readTime);
 		  else if(readState == RS_WAIT)
-			  readState = onWait(readTime, &display);
-		  else if(readState == RS_RESPONSE) {
-			  readState = onResponse(&display);
-		  }
+			  readState = onWait(readTime);
+		  else if(readState == RS_RESPONSE)
+			  readState = onResponse();
 	  }
 
 	  // return to home screen 5 second after display info
 	  if(display.mode != DM_HOME_SCREEN && HAL_GetTick() - display.time > INFO_DISPLAY_TIME*1000)
-		  display.mode = displayHomeScreen();
+		  display.mode = lcdDipsplayHomeScreen();
 
     /* USER CODE END WHILE */
 

@@ -74,6 +74,7 @@ void Error_Handler(void);
 #define FEE_SIZE 6
 #define INFO_DISPLAY_TIME 5 // return to home screen after display info (name, fee...)
 #define WAIT_TIME 10
+#define TOGGLE_TIME_MS 50
 
 typedef enum {
 	SYS_READ,
@@ -92,16 +93,14 @@ typedef enum {
 } Write_Status;
 
 // function for check-in/check-out
-Read_State onRead(uint32_t* readTime, Display* display);
-Read_State onWait(uint32_t readTime, Display* display); // wait for reading response (open or deny)
-Read_State onResponse(Display* display);
+Read_State onRead(uint32_t* readTime);
+Read_State onWait(uint32_t readTime); // wait for reading response (open or deny)
+Read_State onResponse();
 void onOpen(char* Rx_data);
 void onDeny(char* Rx_data);
 
 // function for linking user account to a RFID tag
 Write_Status onWrite();
-
-Display_mode displayHomeScreen();
 
 /* USER CODE END Private defines */
 

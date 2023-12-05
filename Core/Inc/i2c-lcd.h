@@ -16,7 +16,13 @@ typedef struct {
 	uint32_t time;
 } Display;
 
-void displayInfo(Display* display, char* str); // printf info in the second row, mark the time to clear this row after some time
+void lcdInit(Display* display);
+
+Display_mode lcdDipsplayHomeScreen();
+
+void lcdPrintInfo(Display* display, const char* str); // printf info in the second row, mark the time to clear this row after some time
+
+void lcdPrintTitle(Display* display, const char* str); // printf in the first row.
 
 void lcd_init (void);   // initialize lcd
 
