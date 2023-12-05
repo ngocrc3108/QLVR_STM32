@@ -7,4 +7,4 @@ typedef enum {
 	GP_ERR
 } Get_Parameter_Status;
 
-Get_Parameter_Status getParameter(uint8_t* queryString, const char* parameterName, uint8_t* value);
+Get_Parameter_Status getParameter(const char* queryString, const char* parameterName, char* value);

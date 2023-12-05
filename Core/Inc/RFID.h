@@ -12,6 +12,7 @@
 typedef enum {
 	RFID_OK = 0,
 	RFID_WRITE_DATA_ERR,
+	RFID_AUTH_ERR,
 	RFID_WRITE_SECTOR_ERR,
 	RFID_READ_ERR,
 	RFID_NO_TARGET,
@@ -20,9 +21,9 @@ typedef enum {
 } RFID_Status;
 
 extern void RFID_Init();
-extern void convertToString(uint8_t* id, uint8_t* str);
-extern void convertStringToHexId(uint8_t* str, uint8_t* id);
-extern RFID_Status writeID(uint8_t* id);
-extern RFID_Status readID(uint8_t* id);
+extern void convertToString(const char* id, char* str);
+extern void convertStringToHexId(const char* str, char* id);
+extern RFID_Status writeID(const char* id);
+extern RFID_Status readID(char* id);
 
 #endif /* INC_RFID_H_ */

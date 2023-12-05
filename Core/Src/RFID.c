@@ -22,13 +22,13 @@ void RFID_Init() {
 	TM_MFRC522_Init();
 }
 
-void convertToString(uint8_t* id, uint8_t* str) {
+void convertToString(const char* id, char* str) {
 	for(uint8_t i = 0; i < ID_SIZE; i++)
-		sprintf((char*)(str + i*2), "%02x", id[i]);
+		sprintf((str + i*2), "%02x", id[i]);
 	str[ID_SIZE*2] = '\0';
 }
 
-void convertStringToHexId(uint8_t* str, uint8_t* id) {
+void convertStringToHexId(const char* str, char* id) {
 	for(uint8_t i = 0, j = 0; i < ID_SIZE; i++, j+=2) {
 		// first character
 		if(str[j] >= '0' && str[j] <= '9')
@@ -44,7 +44,7 @@ void convertStringToHexId(uint8_t* str, uint8_t* id) {
 	}
 }
 
-RFID_Status writeID(uint8_t* id) {
+RFID_Status writeID(const char* id) {
 	//TM_MFRC522_Init();
 	RFID_Status status = RFID_AUTH_BY_DEFAULT;
 	if(TM_MFRC522_Request(PICC_REQIDL, buff) != MI_OK || TM_MFRC522_Anticoll(buff) != MI_OK)
@@ -102,7 +102,7 @@ RFID_Status writeID(uint8_t* id) {
 		if(tryCount >= 10) {
 			TM_MFRC522_Halt();
 			TM_MFRC522_ClearBitMask(MFRC522_REG_STATUS2, 0x08);
-			return RFID_WRITE_SECTOR_ERR;
+			return RFID_AUTH_ERR;
 		}
 	}
 
@@ -112,7 +112,7 @@ RFID_Status writeID(uint8_t* id) {
 	return RFID_OK;
 }
 
-RFID_Status readID(uint8_t* id) {
+RFID_Status readID(char* id) {
 	//TM_MFRC522_Init();
 	if(TM_MFRC522_Request(PICC_REQIDL, buff) != MI_OK || TM_MFRC522_Anticoll(buff) != MI_OK)
 		return RFID_NO_TARGET;
@@ -120,7 +120,7 @@ RFID_Status readID(uint8_t* id) {
 	TM_MFRC522_SelectTag(buff);
 
 	if(TM_MFRC522_Auth(PICC_AUTHENT1A, ID_SECTOR_BLOCK, sysSectorKey, buff) != MI_OK)
-		return RFID_WRITE_DATA_ERR;
+		return RFID_AUTH_ERR;
 
 	uint8_t data[BLOCK_SIZE];
 
