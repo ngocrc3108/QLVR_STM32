@@ -69,30 +69,30 @@ static void MX_TIM3_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-Sys_Mode mode;
+Sys_Mode sysMode;
 Read_State readState;
 char id[ID_SIZE + 1] = {0xEE, 0xEE, 0xEE};
-char str_id[ID_SIZE*2+1];
-char Rx_data[UART_BUFFER_SIZE];
-char Tx_data[UART_BUFFER_SIZE];
+char strId[ID_SIZE*2+1];
+char rxData[UART_BUFFER_SIZE];
+char txData[UART_BUFFER_SIZE];
 Display display;
 uint8_t servoPinValue = 1;
 
-void onOpen(char* Rx_data) {
+void onOpen() {
 	char name[NAME_SIZE];
 	char fee[FEE_SIZE];
 	char dir[5]; // in or out
 	char buf[17];
 
-	getParameter(Rx_data, "name=", name);
-	getParameter(Rx_data, "dir=", dir);
+	getParameter(rxData, "name=", name);
+	getParameter(rxData, "dir=", dir);
 
 	lcd_clear_display();
 	HAL_Delay(50);
 	lcdPrintTitle(&display, name);
 
 	if(strcmp(dir, "out") == 0) {
-		getParameter(Rx_data, "fee=", fee);
+		getParameter(rxData, "fee=", fee);
 		sprintf(buf, "OUT: %s", fee);
 	}
 	else
@@ -101,9 +101,9 @@ void onOpen(char* Rx_data) {
 	lcdPrintInfo(&display, buf);
 }
 
-void onDeny(char* Rx_data) {
+void onDeny() {
 	char reason[LCD_LENGTH+1];
-	getParameter(Rx_data, "reason=", reason);
+	getParameter(rxData, "reason=", reason);
 
 	lcd_clear_display();
 	HAL_Delay(50);
@@ -119,15 +119,15 @@ Write_Status onWrite() {
 	uint8_t isTimeOut;
 	uint8_t dotCount = 0;
 
-	getParameter(Rx_data, "username=", username);
+	getParameter(rxData, "username=", username);
 
-	getParameter(Rx_data, "id=", str_id);
-	convertStringToHexId(str_id, id);
+	getParameter(rxData, "id=", strId);
+	convertStringToHexId(strId, id);
 
 	lcd_clear_display();
 	HAL_Delay(50);
 
-	lcdPrintTitle(&display, "LINK TAG");
+	lcdPrintTitle(&display, "LINK CARD");
 	lcdPrintInfo(&display, username);
 
 	startTime = HAL_GetTick();
@@ -155,13 +155,13 @@ Write_Status onWrite() {
 	}
 
 	if(isTimeOut) {
-	  lcdPrintTitle(&display, "LINK TAG TIMEOUT");
+	  lcdPrintTitle(&display, "LINK CARD TIMEOUT");
 	  return WRITE_TIMEOUT;
 	}
 	else {
-	  lcdPrintTitle(&display, "LINK TAG OK");
-	  sprintf(Tx_data, "cmd=writeRes&status=ok&id=%s", str_id);
-	  HAL_UART_Transmit(&ESP32_UART, (uint8_t*)Tx_data, strlen(Tx_data), 100);
+	  lcdPrintTitle(&display, "LINK CARD OK");
+	  sprintf(txData, "cmd=writeRes&status=ok&id=%s", strId);
+	  HAL_UART_Transmit(&ESP32_UART, (uint8_t*)txData, strlen(txData), 100);
 	}
 
 	display.time = HAL_GetTick();
@@ -174,15 +174,15 @@ Read_State onRead(uint32_t* readTime) {
 	RFID_Status status = readID(id);
 
 	if(status == RFID_AUTH_ERR)
-		lcdPrintInfo(&display, "WRONG CARD");
+		lcdPrintInfo(&display, "INVALID CARD");
 
 	if(status != RFID_OK)
 		return RS_READING; // read again
 
-	convertToString(id, str_id);
-	sprintf(Tx_data, "cmd=read&id=%s",str_id);
+	convertToString(id, strId);
+	sprintf(txData, "cmd=read&id=%s",strId);
 
-	HAL_UART_Transmit(&ESP32_UART, (uint8_t*)Tx_data, strlen(Tx_data), 100);
+	HAL_UART_Transmit(&ESP32_UART, (uint8_t*)txData, strlen(txData), 100);
 
 	*readTime = HAL_GetTick();
 
@@ -222,12 +222,12 @@ Read_State onWait(uint32_t readTime) {
 
 Read_State onResponse() {
 	char cmd[CMD_SIZE];
-	getParameter(Rx_data, "cmd=", cmd);
+	getParameter(rxData, "cmd=", cmd);
 
 	if(strcmp(cmd, "open") == 0)
-		onOpen(Rx_data);
+		onOpen();
 	else if(strcmp(cmd, "deny") == 0)
-		onDeny(Rx_data);
+		onDeny();
 
 	return RS_READING;
 }
@@ -236,17 +236,17 @@ Read_State onResponse() {
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
     // handle interrupt here
-	Rx_data[Size] = '\0'; // ESP32 serial printf ignore the \0, so we have to add it manually
+	rxData[Size] = '\0'; // ESP32 serial printf ignore '\0', so we have to add it manually
 	char cmd[CMD_SIZE];
-	getParameter(Rx_data, "cmd=", cmd);
+	getParameter(rxData, "cmd=", cmd);
 
 	if(strcmp(cmd, "write") == 0)
-		mode = SYS_WRITE;
+		sysMode = SYS_WRITE;
 	else if(readState == RS_WAIT)
 		readState = RS_RESPONSE;
 
 	// enable receive in dma mode again
-    HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, (uint8_t*)Rx_data, UART_BUFFER_SIZE);
+    HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, (uint8_t*)rxData, UART_BUFFER_SIZE);
     __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
 }
 
@@ -287,14 +287,14 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&SERVO_TIMER);
   // using UART in IDLE DMA mode (https://tapit.vn/huong-dan-su-dung-chuc-nang-uart-idle-dma)
-  HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, (uint8_t*)Rx_data, UART_BUFFER_SIZE);
+  HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, (uint8_t*)rxData, UART_BUFFER_SIZE);
   __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
 
   lcdInit(&display);
   RFID_Init();
 
   uint32_t readTime;
-  mode = SYS_READ;
+  sysMode = SYS_READ;
   readState = RS_READING;
 
   /* USER CODE END 2 */
@@ -304,11 +304,11 @@ int main(void)
   while (1)
   {
 	  // writing mode is determined by UART interrupt.
-	  if(mode == SYS_WRITE) {
+	  if(sysMode == SYS_WRITE) {
 		  onWrite();
 
 		  // after write id, change mode back to read.
-		  mode = SYS_READ;
+		  sysMode = SYS_READ;
 		  readState = RS_READING;
 	  }
 	  else {
