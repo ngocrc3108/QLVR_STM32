@@ -47,7 +47,7 @@ I2C_HandleTypeDef hi2c1;
 
 SPI_HandleTypeDef hspi1;
 
-TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_rx;
@@ -62,7 +62,7 @@ static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
-static void MX_TIM3_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -83,6 +83,8 @@ void onOpen() {
 	char fee[FEE_SIZE];
 	char dir[5]; // in or out
 	char buf[17];
+
+	openGate();
 
 	getParameter(rxData, "name=", name);
 	getParameter(rxData, "dir=", dir);
@@ -232,6 +234,14 @@ Read_State onResponse() {
 	return RS_READING;
 }
 
+void openGate() {
+	SERVO_TIMER.Instance->CCR1 = 80;
+}
+
+void closeGate() {
+	SERVO_TIMER.Instance->CCR1 = 28;
+}
+
 // UART interrupt
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
@@ -283,15 +293,18 @@ int main(void)
   MX_USART1_UART_Init();
   MX_I2C1_Init();
   MX_SPI1_Init();
-  MX_TIM3_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_Base_Start_IT(&SERVO_TIMER);
   // using UART in IDLE DMA mode (https://tapit.vn/huong-dan-su-dung-chuc-nang-uart-idle-dma)
   HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_UART, (uint8_t*)rxData, UART_BUFFER_SIZE);
   __HAL_DMA_DISABLE_IT(&HDMA_ESP32_UART_RX, DMA_IT_HT);
 
+  HAL_TIM_PWM_Start(&SERVO_TIMER, TIM_CHANNEL_1);
+
   lcdInit(&display);
   RFID_Init();
+
+  closeGate();
 
   uint32_t readTime;
   sysMode = SYS_READ;
@@ -322,8 +335,10 @@ int main(void)
 	  }
 
 	  // return to home screen 5 second after display info
-	  if(display.mode != DM_HOME_SCREEN && HAL_GetTick() - display.time > INFO_DISPLAY_TIME*1000)
+	  if(display.mode != DM_HOME_SCREEN && HAL_GetTick() - display.time > INFO_DISPLAY_TIME*1000) {
+		  closeGate();
 		  display.mode = lcdDipsplayHomeScreen();
+	  }
 
     /* USER CODE END WHILE */
 
@@ -444,47 +459,61 @@ static void MX_SPI1_Init(void)
 }
 
 /**
-  * @brief TIM3 Initialization Function
+  * @brief TIM2 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM3_Init(void)
+static void MX_TIM2_Init(void)
 {
 
-  /* USER CODE BEGIN TIM3_Init 0 */
+  /* USER CODE BEGIN TIM2_Init 0 */
 
-  /* USER CODE END TIM3_Init 0 */
+  /* USER CODE END TIM2_Init 0 */
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
 
-  /* USER CODE BEGIN TIM3_Init 1 */
+  /* USER CODE BEGIN TIM2_Init 1 */
 
-  /* USER CODE END TIM3_Init 1 */
-  htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 1000-1;
-  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 36-1;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 1440-1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 1000-1;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
   {
     Error_Handler();
   }
   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
   {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM3_Init 2 */
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 28;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
 
-  /* USER CODE END TIM3_Init 2 */
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
 
 }
 
@@ -595,22 +624,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	HAL_TIM_Base_Stop_IT(&SERVO_TIMER);
-	uint16_t period = 36*6-1;// 0.5ms
-
-
-	HAL_GPIO_TogglePin(SERVO_GPIO_Port, SERVO_Pin);
-
-	if(servoPinValue)
-		period = 1440 - period; // 19.5ms
-
-	servoPinValue = !servoPinValue;
-
-	__HAL_TIM_SET_AUTORELOAD(&SERVO_TIMER, period); // update period
-	__HAL_TIM_SET_COUNTER(&SERVO_TIMER, 0); // reset counter
-	HAL_TIM_Base_Start_IT(&SERVO_TIMER); // restart timer
-}
 
 /* USER CODE END 4 */
 

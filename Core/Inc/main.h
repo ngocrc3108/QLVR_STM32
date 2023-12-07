@@ -50,6 +50,8 @@ extern "C" {
 
 /* USER CODE END EM */
 
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
+
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
@@ -70,7 +72,7 @@ void Error_Handler(void);
 /* USER CODE BEGIN Private defines */
 #define UART_BUFFER_SIZE 100
 #define ESP32_UART huart1
-#define SERVO_TIMER htim3
+#define SERVO_TIMER htim2
 #define HDMA_ESP32_UART_RX hdma_usart1_rx
 #define CMD_SIZE 20
 #define NAME_SIZE 17 //include '\0'
@@ -101,6 +103,8 @@ Read_State onWait(uint32_t readTime); // wait for reading response (open or deny
 Read_State onResponse();
 void onOpen();
 void onDeny();
+void openGate();
+void closeGate();
 
 // function for linking user account to a RFID tag
 Write_Status onWrite();
