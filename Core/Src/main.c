@@ -154,6 +154,9 @@ Write_Status onWrite() {
 		isTimeOut = currentTime - startTime > 10*1000;
 	}
 
+	display.time = HAL_GetTick();
+	display.mode = DM_INFO;
+
 	if(isTimeOut) {
 	  lcdPrintTitle(&display, "LINK CARD TIMEOUT");
 	  return WRITE_TIMEOUT;
@@ -163,9 +166,6 @@ Write_Status onWrite() {
 	  sprintf(txData, "cmd=writeRes&status=ok&id=%s", strId);
 	  HAL_UART_Transmit(&ESP32_UART, (uint8_t*)txData, strlen(txData), 100);
 	}
-
-	display.time = HAL_GetTick();
-	display.mode = DM_INFO;
 
 	return WRITE_OK;
 }
