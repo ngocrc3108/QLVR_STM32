@@ -73,6 +73,7 @@ void Error_Handler(void);
 #define UART_BUFFER_SIZE 100
 #define ESP32_UART huart1
 #define SERVO_TIMER htim2
+#define BUZZER_TIMER htim3
 #define HDMA_ESP32_UART_RX hdma_usart1_rx
 #define CMD_SIZE 20
 #define NAME_SIZE 17 //include '\0'
@@ -96,6 +97,14 @@ typedef enum {
 	WRITE_OK = 0,
 	WRITE_TIMEOUT
 } Write_Status;
+
+typedef enum {
+	BUZZER_OFF = 0,
+	BUZZER_ON
+} Buzzer_Status;
+
+extern Buzzer_Status buzzerStatus;
+
 
 // function for check-in/check-out
 Read_State onRead(uint32_t* readTime);

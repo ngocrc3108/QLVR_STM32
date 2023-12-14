@@ -119,6 +119,8 @@ RFID_Status readID(char* id) {
 
 	TM_MFRC522_SelectTag(buff);
 
+	buzzerStatus = BUZZER_ON; // alert for 100ms
+
 	if(TM_MFRC522_Auth(PICC_AUTHENT1A, ID_SECTOR_BLOCK, sysSectorKey, buff) != MI_OK)
 		return RFID_AUTH_ERR;
 

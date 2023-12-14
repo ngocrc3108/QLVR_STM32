@@ -3,6 +3,7 @@
 
 #include "rc522.h"
 #include "string.h"
+#include "main.h"
 
 #define ID_SIZE 12
 #define BLOCK_SIZE 16
