@@ -96,7 +96,6 @@ char strId[ID_SIZE*2+1];
 char rxData[UART_BUFFER_SIZE];
 char txData[UART_BUFFER_SIZE];
 Display display;
-uint8_t servoPinValue = 1;
 Buzzer_Status buzzerStatus = BUZZER_OFF;
 
 void onOpen() {
