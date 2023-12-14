@@ -78,7 +78,6 @@ char strId[ID_SIZE*2+1];
 char rxData[UART_BUFFER_SIZE];
 char txData[UART_BUFFER_SIZE];
 Display display;
-uint8_t servoPinValue = 1;
 
 void onOpen() {
 	char name[NAME_SIZE];
@@ -242,12 +241,6 @@ void openGate() {
 
 void closeGate() {
 	SERVO_TIMER.Instance->CCR1 = 28;
-}
-
-void buzzer() {
-	  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-	  HAL_Delay(100);
-	  HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
 }
 
 // UART interrupt
