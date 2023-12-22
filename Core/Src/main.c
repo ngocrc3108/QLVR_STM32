@@ -95,8 +95,14 @@ char id[ID_SIZE + 1] = {0xEE, 0xEE, 0xEE};
 char strId[ID_SIZE*2+1];
 char rxData[UART_BUFFER_SIZE];
 char txData[UART_BUFFER_SIZE];
-Display display;
-Buzzer_Status buzzerStatus = BUZZER_OFF;
+Display display = {
+		.mode = DM_HOME_SCREEN,
+		.time = 0
+};
+Buzzer buzzer = {
+		.status = BUZZER_OFF,
+		.time = 0
+};
 
 void onOpen() {
 	char name[NAME_SIZE];
@@ -140,6 +146,9 @@ Write_Status onWrite() {
 	uint32_t toggleTime;
 	uint8_t isTimeOut;
 	uint8_t dotCount = 0;
+
+	buzzer.time = 500;
+	buzzer.status = BUZZER_ON;
 
 	getParameter(rxData, "username=", username);
 
@@ -774,11 +783,11 @@ void StartBuzzerTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    if(buzzerStatus == BUZZER_ON) {
+    if(buzzer.status == BUZZER_ON) {
   	  HAL_TIM_PWM_Start(&BUZZER_TIMER, TIM_CHANNEL_1);
-  	  osDelay(100);
+  	  osDelay(buzzer.time);
   	  HAL_TIM_PWM_Stop(&BUZZER_TIMER, TIM_CHANNEL_1);
-  	  buzzerStatus = BUZZER_OFF;
+  	  buzzer.status = BUZZER_OFF;
     }
 	//osDelay(1);
   }

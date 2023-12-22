@@ -103,8 +103,12 @@ typedef enum {
 	BUZZER_ON
 } Buzzer_Status;
 
-extern Buzzer_Status buzzerStatus;
+typedef struct {
+	Buzzer_Status status;
+	uint16_t time;
+} Buzzer;
 
+extern Buzzer buzzer;
 
 // function for check-in/check-out
 Read_State onRead(uint32_t* readTime);

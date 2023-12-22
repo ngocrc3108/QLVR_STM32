@@ -66,6 +66,9 @@ RFID_Status writeID(const char* id) {
 		status = RFID_AUTH_BY_SYSTEM;
 	}
 
+	buzzer.time = 100;
+	buzzer.status = BUZZER_ON;
+
 	uint8_t writeData[BLOCK_SIZE];
 	uint8_t dataAfter[BLOCK_SIZE];
 	uint8_t tryCount = 0;
@@ -119,7 +122,9 @@ RFID_Status readID(char* id) {
 
 	TM_MFRC522_SelectTag(buff);
 
-	buzzerStatus = BUZZER_ON; // alert for 100ms
+	// alert for 100ms
+	buzzer.time = 100;
+	buzzer.status = BUZZER_ON;
 
 	if(TM_MFRC522_Auth(PICC_AUTHENT1A, ID_SECTOR_BLOCK, sysSectorKey, buff) != MI_OK)
 		return RFID_AUTH_ERR;
